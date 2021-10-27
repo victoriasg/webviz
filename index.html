@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Leaflet Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.0.3/dist/leaflet.css"/>
+    <style>
+    html { height:100%;}
+        body {
+         height:100%;
+         padding: 0;
+         margin: 0;
+         }
+
+        #map {
+          width: 100%;
+          margin: 0 auto;
+          height: 95%;
+         }
+
+        .info {
+             z-index: 1000;
+             position: absolute;
+             right: 40%;
+             top: 5%;
+             padding: 6px 8px;
+             font: 14px Arial, Helvetica, sans-serif;
+             text-align: center;
+             background: white;
+             background: rgba(255, 255, 255, 0.8);
+             box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+             border-radius: 5px;
+        }
+
+        .info h1 {
+             font-size: 16px;
+             margin: 0 0 5px;
+             color: #777777;
+        }
+
+
+    .legend {
+         line-height: 18px;
+         color: #333333;
+         font-family: 'Open Sans', Helvetica, sans-serif;
+         padding: 6px 8px;
+         background: white;
+         background: rgba(255,255,255,0.8);
+         box-shadow: 0 0 15px rgba(0,0,0,0.2);
+         border-radius: 5px;
+     }
+
+    .legend i {
+         width: 28px;
+         height: 18px;
+         float: left;
+         margin-right: 8px;
+         opacity: 0.7;
+     }  
+
+
+    .legend p {
+         font-size: 12px;
+         line-height: 18px;
+         margin: 0;
+     }
+
+    </style>   
+</head>
+<html> 
+<body>
+    <!-- Our web map and content will go here -->  
+    <script src="https://unpkg.com/leaflet@1.0.3/dist/leaflet.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <div id="map" 
+    </div>
+    <script>
+        var map = L.map('map', {center: [39.981192, -75.155399], zoom: 11});
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+        map.doubleClickZoom.disable();
+
+        var mbAttr = 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, ' +
+                'Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
+            mbUrl = 'https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw';
+            
+        var grayscale   = L.tileLayer(mbUrl, {id: 'mapbox/light-v9', tileSize: 512, zoomOffset: -1, attribution: mbAttr}),
+            streets  = L.tileLayer(mbUrl, {id: 'mapbox/streets-v11', tileSize: 512, zoomOffset: -1, attribution: mbAttr});     
+        var baseMaps = {
+            "grayscale": grayscale,
+            "streets": streets
+        };
+
+        //Adding icon    
+        var myIcon = L.icon({
+            iconUrl: 'temple.png',
+            iconSize: [38, 40],
+            iconAnchor: [22, 94],
+            popupAnchor: [-3, -76],
+            shadowSize: [68, 95],
+            shadowAnchor: [22, 94]
+        });
+
+
+        //Add Universities markers
+        var temple = L.marker([39.981192, -75.155399], {icon:myIcon});
+        var drexel = L.marker([39.957352834066796, -75.18939693143933]);
+        var penn = L.marker([39.95285548473699, -75.19309508637147]);
+
+
+        //Group universities marker
+        var universities = L.layerGroup([temple, drexel, penn]);
+        var universityLayer = {
+             "Phily University": universities
+        };
+
+        // add point marker
+        var myDataPoint = L.marker([39.981192, -75.155399]).addTo(map);
+        myDataPoint.bindPopup("This is Temple University.");
+        myDataPoint.bindPopup("<h3>Temple University</h3><p>Philadelphia, PA<br>Information about Temple University.</p>");
+        
+        
+        // Create an Empty Popup
+        var popup = L.popup();
+
+        // Write function to set Properties of the Popup
+        function onMapClick(e) {
+            popup
+                .setLatLng(e.latlng)
+                .setContent("You clicked the map at " + e.latlng.toString())
+                .openOn(map);
+        }
+        
+        // Listen for a click event on the Map element
+        map.on('click', onMapClick);
+        
+        // Set style function that sets fill color property equal to blood lead
+       function styleFunc(feature) {
+         return {
+            fillColor: setColorFunc(feature.properties.num_bll_5p),
+            fillOpacity: 0.9,
+            weight: 1,
+            opacity: 1,
+            color: '#ffffff',
+            dashArray: '3'
+         };
+        }
+      
+
+        // Set function for color ramp, you can use a better palette
+        function setColorFunc(density){
+            return density > 100 ? '#016c59' :
+               density > 50 ? '#1c9099' :
+               density > 30 ? '#67a9cf' :
+               density > 10 ? '#bdc9e1' :
+               density > 0 ? '#f6eff7' :
+                             '#BFBCBB';
+            };
+
+       // load GeoJSON from an external file
+        $.getJSON("blood_lead.geojson",function(data){
+            // add GeoJSON layer to the map once the file is loaded
+            neighborhoodsLayer = L.geoJson(data, {
+                style: styleFunc,
+                onEachFeature: function(feature, layer){
+                    console.log(feature);
+                    layer.on({
+                        mouseover: highlightFeatureFunc,
+                        mouseout: resetHighlightFunc,
+                        click: zoomFeatureFunc
+                    });
+
+                    layer.bindPopup('Blood lead level: '+feature.properties.num_bll_5p);
+                }
+            }).addTo(map);
+
+            // Adding control layers
+            var overlayLayer = {
+                "blood_lead_level": neighborhoodsLayer,
+                "Phily University": universities
+            };
+
+            L.control.layers(baseMaps, overlayLayer).addTo(map);
+
+           });
+        // As an additional touch, let’s define a click listener that zooms to the state: 
+        function zoomFeatureFunc(e){
+            console.log(e.target.getBounds());
+            map.fitBounds(e.target.getBounds().pad(1.5));
+        }
+
+        function highlightFeatureFunc(e){
+            var layer = e.target;
+
+            layer.setStyle({
+                weight: 5,
+                color: 'yellow',
+                dashArray: '',
+                fillOpacity: 0.7
+            });
+            // for different web browsers
+            if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+                layer.bringToFront();
+            }
+        }
+
+
+        // Define what happens on mouseout:
+        function resetHighlightFunc(e) {
+            neighborhoodsLayer.resetStyle(e.target);
+        }  
+
+
+        // Add Scale Bar to Map
+        L.control.scale({position: 'bottomleft'}).addTo(map);
+
+
+        // Create Leaflet Control Object for Legend
+        var legend = L.control({position: 'bottomright'});
+
+        // Function that runs when legend is added to map
+        legend.onAdd = function (map) {
+            // Create Div Element and Populate it with HTML
+            var div = L.DomUtil.create('div', 'legend');            
+            div.innerHTML += '<b>Blood lead level-----</b><br />';
+            div.innerHTML += 'by census tract<br />';
+            div.innerHTML += '<br>';
+            div.innerHTML += '<i style="background: #016c59"></i><p>100+</p>';
+            div.innerHTML += '<i style="background: #1c9099"></i><p>50-100</p>';
+            div.innerHTML += '<i style="background: #67a9cf"></i><p>30-50</p>';
+            div.innerHTML += '<i style="background: #bdc9e1"></i><p>10-30</p>';
+            div.innerHTML += '<i style="background: #f6eff7"></i><p>0-10</p>';
+            div.innerHTML += '<hr>';
+            div.innerHTML += '<i style="background: #BFBCBB"></i><p>No Data</p>';
+            // Return the Legend div containing the HTML content
+            return div;
+        };
+
+        // Add Legend to Map
+        legend.addTo(map);
+    </script>
+</body>
+</html>
